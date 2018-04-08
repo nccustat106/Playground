@@ -1,0 +1,776 @@
+---
+title: "Magick"
+author: "yeyuting"
+date: "2018年2月1日"
+output: html_document
+---
+
+
+### 設定工作目錄
+```{r setwd}
+setwd("C:\\RData")
+```
+
+
+### 載入套件
+```{r library, message=FALSE, warning=FALSE}
+library(magrittr)
+library(ggplot2)
+library(magick)
+```
+
+### 查看支援哪些功能與格式
+```{r config}
+str(magick_config())
+```
+
+### 讀取圖片 : image_read()
+
+#### 變數類別為magick-image，以下簡稱為image
+```{r read}
+# image_read(網址或路徑)
+BMO <- image_read('https://i.imgur.com/tyzDiJc.png')
+class(BMO)
+BMO
+```
+
+
+### 圖片資訊 : image_info()
+```{r info}
+image_info(BMO)
+```
+
+
+### 匯出圖片 : image_write()
+```{r write}
+image_write(BMO, path = "finn.jpg", format = "png")
+image_write(BMO, path = "BMO.jpg", format = "png")
+```
+
+
+
+### 格式轉換 : image_convert()
+```{r convert}
+image_types()
+BMO.jpg <- image_convert(BMO,"JPEG")
+image_info(BMO.jpg)
+```
+
+
+### 顯示圖片
+
+image_browse() : 用本機預設瀏覽器顯示圖片
+```{r browse}
+# image_browse(BMO.jpg)
+```
+
+image_display() : 需要X11視窗系統才能顯示
+```{r display}
+# magick::image_display(BMO)
+```
+
+### 圖片裁切
+
+image_trim() : 背景會隨fuzz值自動裁切適當範圍，值越大裁切越多
+```{r trim}
+image_trim(BMO, fuzz = 10)
+image_trim(BMO, fuzz = 20)
+```
+
+image_chop() : 選擇要裁切的畫素大小，裁切原點為左上角，但右下兩邊我裁減不掉
+```{r chop}
+image_chop(BMO,"120X50")
+```
+
+image_crop() : 選擇裁切尺寸以其裁切起點
+
+geometry格式為AxB+X+Y
+
+裁切起點 : 從左算起第X個、從上算起第Y個畫素
+
+裁切尺度 : 寬 = A個畫素，高 = B個畫素
+```{r crop}
+BMO #原圖
+image_crop(BMO.jpg, geometry = "700x700+100+50")
+```
+
+
+### 調整圖片大小
+
+image_scale() : 調整圖片尺寸，寬(或高)會隨著等比例縮放
+```{r scale}
+#寬變400畫素
+image_scale(BMO, "400")
+#高變500畫素
+image_scale(BMO, "X500")
+#寬不超過400，並且高不超過500
+image_scale(BMO, "400X500")
+#寬等於400，高等於500，圖片會變形
+image_scale(BMO, "400X500!")
+```
+
+image_resize() : 功能和跟read_scale差不多，但放大圖片導致模糊時，可以用filter改變模糊效果
+```{r resize}
+simon <- image_read('https://i.imgur.com/Yv0S5K7.png')
+simon
+image_resize(simon, "900X700")
+image_resize(simon, "900X700", filter = "Point")
+image_resize(simon, "900X700", filter = "Sinc")
+filter_types()
+```
+
+### 顏色填滿效果 : image_fill()
+缺點是無法查詢像素點座標，想把牙齒變金色，找得很辛苦
+```{r fill}
+#填充位置point = "+X+Y"，fuzz設定模糊範圍
+image_fill(BMO, color = "gold", point =  "+390+400", fuzz = 60)
+```
+
+### 加入邊框 : image_border()
+```{r border}
+image_border(BMO, "gold", "10x20")  #寬X高
+```
+
+
+### 加入背景 : image_background()
+無法覆蓋既有背景
+```{r background}
+image_background(BMO,"gold")
+
+snail <- image_read("https://ugc.kn3.net/i/origin/http://images.wikia.com/adventuretimewithfinnandjake/images/0/07/Waving_Snail.png")
+snail
+image_background(snail, "gold")
+```
+
+### 圖片旋轉
+
+image_rotate() : 順時針旋轉若干角度
+```{r rotate}
+image_rotate(snail, 30)
+```
+
+image_flip() : 上下翻轉
+```{r flip}
+image_flip(snail)
+```
+
+image_flop() : 左右翻轉
+```{r flop}
+image_flop(snail) 
+```
+
+Guess what?
+```{r , eval= FALSE }
+BMO %>% image_flip %>% image_flop %>% image_rotate(180)
+```
+
+
+### 調節色彩(亮度、飽和度、色相)
+
+原圖預設值皆為100，可能是百分比
+
+```{r modulate}
+#亮度(brightness)，負無限到正無限，小於0皆為黑色
+image_modulate(BMO,brightness = 120,saturation = 100,hue = 100)
+
+#飽和度(saturation)，0則為灰階,可以負值
+image_modulate(BMO,brightness = 100,saturation = 200,hue = 100)
+image_modulate(BMO,brightness = 100,saturation = 0,hue = 100)
+image_modulate(BMO,brightness = 100,saturation = -100,hue = 100)
+
+#色相(hue)，非度數，hen奇怪
+image_modulate(BMO,brightness = 100,saturation = 100,hue = 90)
+```
+
+
+### 模糊效果 : image_blur()
+高斯模糊，radius跟sigma都要設值才有效果
+```{r blur}
+image_blur(BMO,radius = 10,sigma = 3)
+```
+
+
+### 噪點效果 : image_noise()
+```{r noise}
+image_noise(BMO)
+image_noise(BMO, noisetype = "Multiplicative")
+image_noise(BMO, noisetype = "impulse")
+noise_types()
+```
+
+
+### 其他圖片效果(拓印、油畫、負片、黑洞)
+
+```{r effects}
+image_charcoal(BMO) 
+image_charcoal(BMO,radius = 5) 
+image_charcoal(BMO,radius = 5, sigma = 3) 
+
+image_oilpaint(BMO,radius = 5) #radius要設值才有效果
+
+image_negate(BMO)
+
+image_implode(BMO)
+
+```
+
+### 影像卷積(Convolution) : image_convolve()
+
+<iframe src="http://monkeycoding.com/?p=536" height=600 width=800></iframe>
+
+#### 當濾鏡用較不燒腦，可以用scaling跟bias調節效果
+```{r convolve}
+image_convolve(BMO,kernel = 'Ridges',scaling = "120%!",bias = "-5%")
+
+kernel_types() #把這當濾鏡效果會比較不頭疼
+```
+
+### 限制色彩數 : image_quantize()
+```{r quantize}
+image_quantize(BMO, max = 3)  #最多用3種顏色畫出BMO
+image_quantize(BMO, max = 5)  #最多用5種顏色畫出BMO
+image_quantize(BMO, max = 3,colorspace = 'gray') #灰階效果
+colorspace_types() #色彩空間，預設多為sRGB(標準RGB色彩空間)
+```
+
+### 加上註解 : image_annotate()
+
+#### 文字方塊，不支援中文
+```{r annotation}
+#fonts: "mono", "Times", "Helvetica", "Trebuchet","Comic Sans".
+image_annotate(
+    image = BMO, #圖片
+    text = c("BMO the little boy !"), #註解內容
+    size=50,       #文字大小
+    degrees = -5,    #旋轉角度
+    gravity = "south",  #設定座標原點，預設在"NorthWest"
+    location = "-10+35",  #註解的座標，跟gravity搭配使用
+    color = "blue",  #文字顏色
+    strokecolor = "black", #文字邊緣顏色
+    boxcolor = "lightgreen", #文字方塊背景顏色
+    font = "mono") #字型
+gravity_types()
+```
+
+
+
+### 搭配piping處理，並做簡單複習
+```{r piping}
+
+(BMO.light <- BMO %>% 
+    image_crop("700x700+100+50") %>% 
+    image_border("skyblue","10X10") %>% 
+    image_fill("gold","+300+360",fuzz = 60) %>%
+    image_fill("gold","+270+355",fuzz = 50) %>%
+    image_scale("720") %>% 
+    image_annotate(text = c("BMO the golden teeth"),
+                   size = 50,
+                   gravity = "south", 
+                   location = "+0+50",
+                   degrees = -5,
+                   color = "gold") %>% 
+    image_oilpaint(3.5))
+
+(BMO.dark <- BMO %>% 
+        image_crop("700x700+100+50") %>% 
+        image_border("skyblue","10X10") %>% 
+        image_fill("gold","+300+360",fuzz = 60) %>%
+        image_fill("gold","+270+355",fuzz = 50) %>%
+        image_scale("720") %>% 
+        image_flop %>%
+        image_annotate(text = c("BMO the blue teeth"),
+                       gravity = "south",
+                       size = 50,
+                       location = "+0+50",
+                       degrees = 5,
+                       color = "gold") %>%
+        image_modulate(b = 110, s = -100) %>% 
+        image_oilpaint(3.5))
+
+
+```
+
+### 合併圖片: image_append()
+
+水平合併
+```{r append}
+image_append(c(BMO.dark,BMO.light)) 
+```
+
+鉛直合併
+```{r stack}
+stack <- image_append(c(BMO.dark,BMO.light),stack = T) 
+stack
+```
+
+
+
+### 影像合成
+
+image_mosaic():將數張圖依次加疊成一張靜圖，每張圖畫素不受影響
+```{r mosaic}
+pic1 <- image_read('https://orig00.deviantart.net/cf11/f/2012/220/4/6/adventure_time_tree_house_by_transparentstuff-d5adrao.png') %>% image_scale("720")
+pic2 <- image_read("http://3rd-strike.com/wp-content/uploads/2015/02/Adventure-Time.png")
+
+image_mosaic(c(pic1, pic2)) 
+image_mosaic(c(pic2, pic1))
+```
+
+image_flatten() :同樣依次疊加，但尺寸以第一張圖的畫素為準
+```{r flatten}
+pic2%>% image_border("black","10X10")
+image_flatten(c(pic2, pic1))
+
+pic1 %>% image_border("black","10X10")
+image_flatten(c(pic1, pic2))
+
+#operator可以選擇影像的疊加方式，見下方示意圖
+layer <- c(pic1, pic2)
+image_flatten(layer, operator = 'MinusSrc')
+image_flatten(layer, operator = 'HardLight')
+
+
+```
+
+#### operator示意圖，有些圖看起來好像沒差
+```{r operator, echo=FALSE}
+image_read('https://i.stack.imgur.com/cJNBf.png') 
+```
+
+
+
+### compose_types() :
+依次疊加，畫素以第一張為主，offset可以調整圖片位置
+```{r compose}
+pic3 <- image_read("https://i.imgur.com/w19H9ZC.png") %>% image_scale("360X300")
+pic3
+image_composite(image = pic1, #被疊加的影像
+                composite_image = pic3, #欲疊加的影像
+                operator = "over",
+                offset = "+100+200") #調整圖片位置
+```
+
+### 影像合成範例
+想先將pic3旋轉、縮小，注意要先設定背景為none，否則旋轉後增加的面積會自動留白，比較下方例子
+```{r AT_composite}
+pic3  %>%
+    #image_background("none") %>% 
+    image_rotate(-10)  %>% 
+    image_scale("350") %>% 
+    image_background("skyblue")
+
+pic3  %>%
+        image_background("none") %>% 
+        image_rotate(-10)  %>% 
+        image_scale("350")%>% 
+        image_background("skyblue")
+
+pic3.rot <- pic3  %>%
+        image_background("none") %>% 
+        image_rotate(-10)  %>% 
+        image_scale("350")
+
+pic3.rot
+
+#把三張圖疊圖，並適當調整位置、大小，裁切並輸出
+AT <- pic1 %>% 
+    #將pic3疊到pic1，並適當調整位置
+    image_composite(pic3.rot,
+                    operator = "over",
+                    offset = "+80+180") %>% 
+    #再繼續將pic2疊上，調整位置
+    image_composite(image_scale(pic2,"500"),
+                    operator = "over",
+                    offset = "+0+20") %>% 
+    #圖片右方多餘，裁切影片
+    image_crop("500X500") %>% 
+    #加上註解
+    image_annotate(text = "Finn & Jack", 
+                   gravity = "southeast",
+                   location = "+15+10",
+                   size = 20,color = "black",
+                   font = "Comic Sans") %>%
+    #原無背景，加入背景顏色，在R跑沒問題，MD就失效了
+    image_background("skyblue") %>% 
+    image_scale("720X720")
+AT
+
+```
+
+### 局部馬賽克效果
+```{r part_mosaic}
+part_mosaic <- function(image.magick, geometry){
+    #format.info <- image_info(image.magick)$format
+    image.magick %>% 
+    #image_convert(format = "PNG") %>% 
+    image_crop(geometry = geometry) %>% 
+    image_scale(image = ., geometry = 
+                paste(0.1*(image_info(.)$width),"X",
+                      0.1*(image_info(.)$height))) %>% 
+    image_resize(image = ., geometry = 
+                    paste(10*(image_info(.)$width),"X",
+                          10*(image_info(.)$height)),
+                 filter = "box") %>% 
+    image_composite(image = image.magick, 
+                    composite_image = .,
+                    operator = "over",
+                    offset = geometry) %>% 
+    #image_convert(format = format.info) %>% 
+    return()
+}
+
+#BMO臉上打馬賽克
+part_mosaic(BMO,"370X300+250+170")
+
+```
+
+svg圖檔也適用，跟我想像的不太一樣
+```{r svg}
+kiwi <- image_read('http://www.webhek.com/wordpress/wp-content/uploads/2014/05/kiwi.svg')
+
+part_mosaic(kiwi,"200X200+350+100")
+```
+
+
+
+### 讀取GIF
+
+跟讀取圖片一樣用image_read()
+```{r GIF}
+kat <- image_read("https://tctechcrunch2011.files.wordpress.com/2015/08/safe_image.gif")
+kat
+length(kat) #GIF的圖片張數
+
+kat %>% image_scale("500X500") #調整GIF的畫素容易破圖
+
+#動畫處理很久，畢竟140張圖都要處理
+kat %>% image_flop %>%
+image_annotate("Run Forrest Run", size = 40, color = "blue", gravity = "North")
+```
+
+### 動畫 : image_animate()
+常用來調整動畫速度
+```{r animation}
+#RStudio中用c()連結就有動畫效果，fps固定為1
+#image_animate可透過fps調整動畫播放速度，以及重播次數
+image_animate(image = c(pic1, pic2, pic3),
+              fps = 2, 
+              #loop = 300 ,
+              dispose = "none")
+#加入透明邊框巧妙使圖形產生位移
+image_animate(image = c(pic1, pic2,image_border(pic3,"none","100X200")),
+              fps = 2, dispose = "none")
+dispose_types()
+```
+
+
+### 漸變效果
+frams為每次漸變過程，間隔的圖片張數
+```{r morph}
+#BMO.light → BMO.dark → BMO.light
+frames <- image_morph(c(BMO.light, image_flop(BMO.dark), BMO.light), frames = 20)
+length(frames)
+image_info(frames) %>% head
+
+image_append(c(frames[1],frames[11],frames[22]))
+
+#利用image_animate調整動畫速度
+BMO.morph <- image_animate(frames,fps = 10)
+BMO.morph
+```
+
+將動畫嵌入靜圖
+```{r GIF_onto_Image}
+jake.gif <- image_read('https://media.giphy.com/media/G9AjdAf3cGmfS/giphy.gif') %>% image_crop("220X200+200+30") %>% image_scale("80")
+jake.gif
+
+#將jake.gif動畫加到AT靜圖上
+AT %>% image_composite(jake.gif, operator = "over",offset = "+600+600") %>%
+    image_animate(fps = 10)
+
+```
+
+
+### 將統計圖表進行後製
+
+image_graph():開啟Magick的圖形裝置介面(GDI)
+
+開啟圖形裝置介面後，統計圖表會繪製到GDI，就可以用Magick套件加工，輸出圖表後記得用dev.off()關閉裝置介面
+
+```{r graph}
+figure <- image_graph(width = 700, height = 700, res = 96)
+class(figure)
+
+ggplot2::qplot(carat,price,
+               data =  diamonds[sample(1:50000,1000),],
+               colour = color)
+dev.off()
+figure
+
+mark1 <- pic3 %>% image_scale("150X150")
+mark1
+myfig1 <- image_composite(figure, mark1, offset = "+450+500")%>%
+    image_animate(fps = 10,dispose = "none")
+myfig1
+
+mark2 <- jake.gif %>% image_scale("150X150")
+mark2
+myfig2 <- image_composite(figure, mark2, offset = "+450+500")%>%
+    image_animate(fps = 10,dispose = "none")
+myfig2
+
+```
+
+
+###  在Magick的GDI開啟圖片: image_draw()
+
+image_draw利用Magic圖形裝置介面開啟圖片(Magick-Image)，就能用同時用**Magick套件**和**低階繪圖函數**進行後製，同樣後製完後記得用dev.off()關閉裝置介面
+
+```{r image_draw}
+img <- image_draw(myfig2)
+
+#Q abline能不能設邊界
+abline(h = 200, col = 'red',lwd = '2', lty = "dotted")
+abline(h = 300, col = 'blue',lwd = '2', lty = "dotted")
+
+#rect逆時針左下右上，注意座標須改用像素座標系統，左上角為原點，像右為x軸正向，向下為y軸正向
+rect(80, 650, 240, 500, border = "red", lty = "dashed", lwd = 5)
+
+#加入註解,x、y設定文字方塊的寬跟高要多長
+text(x = 30,y =  250, "Heisenberg", family = "monospace", cex = 4, srt = 90)
+
+#也能用image_annotation加入註解
+image_annotate(img,"Say my name",size = 80, gravity = "south")
+
+dev.off()
+
+
+```
+
+
+### 時間序列動態視覺化 
+
+人均GDP對平均壽命的散佈圖，點大小隨人口數變化，洲以顏色區分，不同時間的散佈圖以動畫呈現
+```{r time_series,message=FALSE,warning=FALSE,eval=FALSE}
+#各國人均GDP資料
+library(gapminder)
+head(gapminder)
+#將資料按照年份進行分割
+data.list <- split(gapminder, gapminder$year)
+#用ggplot繪圖輸出到圖形裝置介面
+img <- image_graph(600, 340, res = 96)
+
+data.list %>% lapply(function(data){
+    ggplot(data, aes(gdpPercap, lifeExp, 
+             size = pop, color = continent)) +
+           scale_size("populati0n", 
+             limits = range(gapminder$pop)) + 
+           geom_point() + ylim(20, 90) + 
+           scale_x_log10(limits = range(gapminder$gdpPercap)) +
+           #標題為該分割資料的年份
+           ggtitle(data$year) + 
+           theme_classic()
+})
+dev.off()
+
+animation <- image_animate(img, fps = 2)
+animation
+
+animation.mark <- image_composite(animation,image_scale(pic3,"100"),offset = "+380+200")
+animation.mark
+
+image_write(animation.mark,"gdp.gif") #以gif檔匯出
+
+```
+
+
+
+### 在R的GDI中處理圖片(以下程式建議在RStudio運行)
+
+#### 先用Magick::image_read讀取圖片，再用Raster::as.rater轉成raster變數，便可用plot函數輸出圖片
+```{r raster}
+frog <- image_read('https://media.kocpc.com.tw/kocpc/2018/01/1517192408-1d049705f439174de7fe71ecffbaeb79.jpg')
+frog 
+class(frog)
+#將magick-image變數轉成raster變數
+frog.ras <- as.raster(frog)
+head(frog.ras)
+
+#raster變數內容為像素矩陣，plot可直接畫raster
+class(frog.ras)
+
+## magick-image繪畫在Viewer，plot則是畫在plots
+plot(frog.ras)
+
+#用locator在R-GDI(Plots)中選4點，找出圖表中的點座標(對應橫縱軸數值)
+locator(n = 4,type = "n") 
+
+#此時便可用低階繪圖函數處理圖片
+rect(11, 15, 189, 189, border = "red", lty = "dashed", lwd = 5)
+```
+
+
+### 在R-GDI(Plots)的圖表內疊加圖片
+
+rasterImage() : 將靜圖加到統計圖表，為R內建的函數，可以當作是低階繪圖函數
+```{r rasterImage}
+plot(iris$Sepal.Length) 
+locator(n = 4,type = "n")
+rasterImage(frog, 0, 6, 29, 8) #位置參數跟rect一樣
+```
+
+
+### grid.raster() : 將靜圖加到統計圖表
+需要載入grid套件，低階繪圖函數，位置參數較不同
+```{r grid.raster}
+library(grid)
+hist(iris$Sepal.Length)
+#位置參數是中心位置的X、Y座標，以及寬跟高，數值都介於0~1之間，是跟整張圖表寬跟高的相對比例
+grid.raster(frog,x = 0.82, y = 0.68, width = 0.16, height = 0.25) 
+
+```
+
+### 輸出圖形固定寬高比並填滿視窗
+
+利用內建raster套件中的brick函數能讀取本機圖片，並轉成RasterBrick圖形變數，再透過plotRGB輸出圖型
+```{r raster_package,warning=FALSE,message=FALSE}
+library(raster) #brick跟plotRGB都在raster套件中
+```
+
+```{r tempfile}
+gunter <- image_read("https://i.imgur.com/9WWKkxl.png")
+gunter
+
+tempfile()  #tempfile()是創建一個新的佔存檔路徑
+
+#將圖檔寫到佔存路徑，tiff是點陣圖格式之一，似乎是很彈性的格式
+path <- tempfile() 
+image_write(gunter, path = path, format = 'tiff')
+
+```
+
+可用brick讀取圖檔路徑，不能讀取網址或magick-image變數，只能先將magick-image匯出再用brick匯入
+```{r brick}
+gunter.rb <- brick(path) #brick佔存檔路徑
+
+class(gunter.rb)
+head(gunter.rb,2) #將圖檔brick後是像素矩陣
+
+#RasterBrick變數跟Spatial Polygon Data Frame有點像，兩種變數都屬於S4 class，包含數個slots可用@呼叫
+str(gunter.rb)
+
+#用plotRGB繪製RasterBrick變數，隨著視窗大小變化，圖形寬高比例不會跑掉，並總是填滿視窗
+plotRGB(gunter.rb)
+
+```
+
+#### brick也能讀像素矩陣，可從magick-image中找出像素資訊
+```{r brick_array}
+##magick.image變數frog[[1]]偷藏著bitmap資訊
+frog.bmp <- frog[[1]]
+class(frog.bmp)
+#將bitmap的像素資訊轉成像素矩陣
+frog.array <- as.integer(frog.bmp)
+class(frog.array)
+
+#rb.fail <- brick(frog.bmp)
+rb <- brick(frog.array) #brick不能讀bitmap變數，卻可讀array
+class(rb)
+
+#asp=高與寬的比值
+plotRGB(rb, asp = 1)
+
+```
+
+
+
+
+### 讀取PDF檔 
+image_read() : 讀取pdf失敗，原因不明
+```{r pdf}
+# mypdf <- image_read('https://ir.nctu.edu.tw/bitstream/11536/71395/1/342302.pdf')
+
+# mypdf <- image_read('C:/RData/magick.pdf')
+```
+
+
+### 套件pdftools :: pdf_render_page()
+一次只能讀一頁，無法知道總頁數
+```{r pdftools , warning=FALSE}
+library(pdftools)
+pdf2bmp <- pdf_render_page('https://cran.r-project.org/web/packages/magick/magick.pdf', page = 1)
+head(pdf2bmp)
+#解析後為點陣圖(bitmap,bmp)
+class(pdf2bmp)
+#可以用image_read讀取bmp檔
+bmp2png <- image_read(pdf2bmp)
+bmp2png
+```
+
+### 光學字符辨識(Optical Character Recognition,OCR)
+image_ocr : 辨識圖片中的字符(由左而右，從上到下) 
+```{r ocr}
+words.image <- image_read("http://jeroen.github.io/images/testocr.png")
+words.image
+class(words.image)
+
+
+words.ocr <- magick::image_ocr(words.image)
+class(words.ocr)
+
+cat(words.ocr)
+```
+
+image_ocr功能來自tesseract套件中ocr函數
+```{r tesseract}
+library(tesseract)
+tesseract::ocr(words.image) == magick::image_ocr(words.image)
+```
+
+中文字符辨識，錯字不少
+```{r chinese}
+chi_words <- image_read('http://farm4.static.flickr.com/3207/3009617589_7be5462002_o.jpg')
+chi_words
+
+chi_words.ocr <- image_ocr(chi_words,language = 'chi_tra')
+cat(chi_words.ocr)
+
+```
+
+無法辨識中文字的話，先跑以下兩行下載繁中跟簡中字庫
+```{r download}
+# tesseract_download("chi_tra", datapath = NULL, progress = TRUE)
+# tesseract_download("chi_sim", datapath = NULL, progress = TRUE)
+
+#其他字庫可參考下列網站:https://github.com/tesseract-ocr/tessdata
+```
+
+
+
+###辨識pdf
+dpi要夠高才能辨識的了，否則就是一堆wwwwwww
+```{r pdf_ocr}
+pdf.imag <- pdf_render_page('https://cran.r-project.org/web/packages/magick/magick.pdf', page = 1,dpi = 300) %>% image_read 
+
+pdf.imag
+
+pdf.imag %>% image_ocr %>% cat
+
+```
+
+### 辨識數統課本casella_berger_statistical_inference
+符號無法順利辨識，公式全亂了
+```{r stat_inf}
+stat_inf <- NULL
+for(i in 30:32){
+    stat_inf <- c(stat_inf, pdf_render_page('https://fsalamri.files.wordpress.com/2015/02/casella_berger_statistical_inference1.pdf', page = i,dpi = 800) %>% image_read %>% image_ocr)
+}
+
+cat(stat_inf[1])
+
+```
+
+ 
+
+
+

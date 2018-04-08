@@ -1,0 +1,617 @@
+---
+title: "R語言運算效率"
+author: "Hsu & Yeh "
+date: "2018年2月27日"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll:  true
+---
+
+#測程式速度的好工具
+```{r}
+library(microbenchmark)
+```
+
+#一、Pre-allocated
+
+##case I:宣告變數的方式
+
+```{r}
+#宣告NULL
+f1 <- function(n){
+    output <- NULL
+    for(i in 1:n) output[i] <- x[i]
+    return(output)
+}
+
+#宣告變數大小
+f2 <- function(n){
+    output <- c(length(x))
+    for(i in 1:n) output[i] <- x[i]
+    return(output)
+}
+
+#宣告變數種類及大小
+f3 <- function(n){
+    output <- character(length(x))
+    for(i in 1:n) output[i] <- x[i]
+    return(output)
+}
+
+n =  10000
+
+x <- sample(letters, n, replace =  TRUE)
+
+ftime <- microbenchmark(f1(n), f2(n), f3(n))
+ftime
+
+ggplot2::autoplot(ftime)
+```
+
+
+##case II:資料框架的生成方式
+
+```{r}
+# Data.frame + rbind
+g1 <- function(n){
+  df <- data.frame(x = NULL, y = NULL)
+  for(i in 1:n){
+    df <- rbind(df, data.frame(x = i, y = toString(i)))
+  }
+  return(df)
+}
+
+#pre-allocate Data.frame + rbind
+g2 <- function(n){
+  df <- data.frame(x = numeric(), y = character())
+  for(i in 1:n){
+    df <- rbind(df, data.frame(x = i, y = toString(i)))
+  }
+  return(df)
+}
+
+# pre-allocate Data.frame + 直接賦值
+g3 <- function(n){
+  df <- data.frame(x = numeric(1000), y = character(1000), stringsAsFactors = FALSE)
+  for(i in 1:n){
+    df$x[i] <- i
+    df$y[i] <- toString(i)
+  }
+  return(df)
+}
+
+# pre-allocated Vector，賦值後再生成Data.frame
+g4 <- function(n) {
+  x <- numeric(n)
+  y <- character(n)
+  for (i in 1:n) {
+    x[i] <- i
+    y[i] <- i
+  }
+  df <- data.frame(x, y, stringsAsFactors=FALSE)
+  return(df)
+}
+
+n = 100
+gtime <- microbenchmark(g1(n), g2(n), g3(n), g4(n))
+gtime
+ggplot2::autoplot(gtime)
+
+```
+
+
+#二、if條件句 + for迴圈的改善
+
+```{r}
+
+n = 1000
+
+df <- data.frame(col1=rnorm(n),
+                 col2=rpois(n,3),
+                 col3=runif(n),
+                 col4=rchisq(n,2))
+
+df[,5] <- character(nrow(df))
+
+#ifelse內賦值
+c1 <- function(){
+    for (i in 1:nrow(df)) {
+        cond <- ( df[i,1] + df[i,2] + df[i,3] + df[i,4] ) > 4
+        ifelse(cond, df[i,5]<-"TRUE", df[i,5]<-"FALSE")
+    } 
+    return(df)
+}
+
+#ifelse外賦值
+c2 <- function(){
+    for (i in 1:nrow(df)) {
+        cond <- ( df[i,1] + df[i,2] + df[i,3] + df[i,4] ) > 4
+        df[i,5]<-ifelse(cond==T,"TRUE","FALSE")
+    }
+    return(df)
+}
+
+#if...else...
+c3 <- function(){
+    for(i in 1:nrow(df)){
+        cond <- ( df[i,1] + df[i,2] + df[i,3] + df[i,4] ) > 4
+        
+        if(cond){
+            df[i,5]<-"TRUE"
+        }else{
+            df[i,5]<-"FALSE"
+        }
+    }
+    return(df)
+}
+
+#只在條件語句為真時執行循環過程
+c4 <- function(){
+    df[,5] <- "FALSE"
+    
+    for(i in 1:nrow(df)){
+        cond <- ( df[i,1] + df[i,2] + df[i,3] + df[i,4] ) > 4
+        if(cond) df[i,5]<-"TRUE"
+    }
+    
+    return(df)
+}
+
+#條件先在迴圈外完成，迴圈內僅做提取
+c5 <- function(){
+    cond <- ( df[,1] + df[,2] + df[,3] + df[,4] ) > 4
+    
+    for(i in 1:nrow(df)){
+        df[i,5] <- ifelse(cond[i],"TRUE","False")
+    }
+    
+    return(df)
+}
+
+#條件先在迴圈外完成+只在條件語句為真時執行循環
+c6 <- function(){
+    df[,5] <- "FALSE"
+    cond <- ( df[,1] + df[,2] + df[,3] + df[,4] ) > 4
+    
+    for(i in 1:nrow(df)){
+        if(cond[i]) df[i,5]<-"TRUE"
+    }
+    
+    return(df)
+}
+
+
+ctime <- microbenchmark(c1(), c2(), c3(), c4(), c5(), c6())
+ctime
+ggplot2::autoplot(ctime)
+```
+
+
+
+
+
+#三、資料框架處理:Data.table v.s. dplyr
+
+Data.table套件簡介
+
+```{r}
+library(data.table)
+library(dplyr)
+```
+
+
+變數宣告跟data.frame一樣
+
+```{r}
+name <- c("Bob","Mary","Jane","Kim","Hank")
+weight <- c(60,65,45,55,60)
+height <- c(170,165,140,135,155)
+birth <- c("1990-1","1980-2","1995-5","1996-4","1977-6")
+accept <- c("no","ok","ok","no","ok")
+
+dt <- data.table(name,weight,height,accept);dt
+df <- data.frame(name,weight,height,accept);df
+```
+
+
+資料類別與結構
+
+```{r}
+str(dt) #字串預設為character
+str(df) #字串預設為factor
+
+```
+
+
+兩者類似的用法
+
+```{r}
+dt[3,2] #data.table
+df[3,2] #numeric
+
+```
+
+data.table和data.frames用法類似
+
+```{r}
+dt[2,] #data.table
+df[2,] #data.frame
+
+dt[,3] #data.table
+df[,3] #numeric
+
+dt[2] #row , data.table
+df[2] #colum , data.frame
+
+dt$name #character
+df$name #factor
+```
+
+##data.table與data.frames無痛轉換
+
+```{r}
+data.frame(dt)
+data.table(df)
+```
+
+
+
+##data.table獨有的功能
+
+###設定索引欄(setkey)
+
+- 將accept設為索引欄
+
+```{r}
+setkey(dt,accept)
+dt
+dt["ok"] #篩選索引欄為"ok"的列
+```
+
+
+###排序(預設是升序,"-"改為降序)
+
+```{r}
+setorder(dt, weight) 
+dt
+setorder(dt, -weight, height) 
+dt
+```
+
+
+
+###dt[篩選那幾列,做什麼運算,哪些變數分組計算]
+
+```{r}
+dt[1:2] #篩選前兩列
+
+dt[weight>55] #篩選體重大於55
+
+dt[,mean(height)] #對身高做平均
+
+dt[weight>55,mean(height)] #篩選篩選體重大於55並對身高做平均
+
+```
+
+
+###增加欄位 
+- data.table[, colname := var1]
+
+```{r}
+newvar<-c("F","M","F","F","M")
+dt[,gender:= newvar];dt
+```
+
+###分組計算
+
+計算平均體重，男女分開計算
+```{r}
+dt[,mean(weight), by = gender]
+```
+
+
+###data.table vs (data.frame + dplyr)
+
+```{r}
+n = 1e4
+IQ = rchisq(n , df = 8 , ncp = 100)
+height = rnorm(n,mean = 168,sd = 15)
+gender = sample(x = c("F","M"),size = n,replace = T)
+dt <- data.table(IQ = IQ, height = height, gender =  gender)
+df <- data.frame(dt)
+head(dt)
+head(df)
+```
+
+```{r}
+mean.dt <- function(){
+    dt[height>170 , mean(IQ) ,by = gender ]
+}
+
+mean.dpl <- function(){
+    
+    df %>%  filter(height>170) %>% group_by(gender) %>% summarise(mean(IQ))
+}
+
+mean.dt()
+mean.dpl()
+
+dtime <- microbenchmark(mean.dt(),mean.dpl())
+ggplot2::autoplot(dtime)
+
+
+```
+#四、Foreach + doParallel / doSnow 
+##如何提升運算速度
+
+##Foreach介紹
+
+```{r, message=FALSE, warning=FALSE}
+library(foreach)
+library(doSNOW)
+library(dplyr)
+library(RCurl)
+library(tm)
+library(tmcn)
+library(rvest)
+library(magrittr)
+library(tidyr)
+library(ggplot2)
+```
+
+基本語法
+
+
+
+foreach(...,
+        .combine,
+        .multicombine=FALSE,
+        .maxcombine=if (.multicombine) 100 else 2,
+        .errorhandling=c('stop', 'remove', 'pass'),
+        .packages=NULL,
+        .export=NULL)
+        
+        
+.combine
+在沒有指定的情況下，foreach輸出的資料型態都是list
+透過.combine可以改變資料的型態
+
+.export
+在foreach使用自訂函數時，需要在.export寫出來
+
+.package
+foreach中所用到的函數都需要在.package先給
+
+
+foreach(變數範圍) %do% 要做的事
+```{r}
+foreach(i=1:3) %do% i^2 
+```
+
+```{r}
+foreach(i=1:3,.combine = "cbind") %do% rnorm(4) 
+```
+
+```{r}
+fun<-function(i){i*(i+1)}
+foreach(i=1:3,.export = "fun")%do%{fun(i)} #輸出為list
+
+foreach(i=1:3,.combine = c,.export = "fun")%do%{fun(i)} #輸出為numeric
+
+foreach(i=1:3,.combine = cbind,.export = "fun")%do%{fun(i)}  #將結果cbind起來
+
+```
+
+%dopar%
+
+做平行運算時把 %do% 改成 %dopar%
+再來要設定需要分成幾組
+```{r}
+#doSnow
+cl<-makeCluster(3) #要開啟3個核心
+registerDoSNOW(cl) #註冊後才真正開啟
+
+foreach(i=1:3,.combine = cbind,.export = "fun")%do%{fun(i)}  #將結果cbind起來
+
+stopCluster(cl) #運算結束後關閉核心
+```
+
+
+
+
+```{r}
+# library(purrr)
+library(foreach)
+library(doParallel)
+library(compiler)
+library(Rcpp)
+```
+
+
+compiler
+```{r}
+func<-function(i){i*(i+1)}
+cfunc<-cmpfun(func) 
+
+system.time({for(i in 1:10000000){
+  func(i)
+}})
+
+system.time({for(i in 1:10000000){
+  cfunc(i)
+}})
+```
+
+
+Rcpp
+```{r}
+for_sum <- function(x){
+    n <- length(x)
+    total <- 0
+    for(i in 1:n){
+       total <- total + x[i]
+    }
+    return(total)
+}
+
+cpp_sum <- cppFunction('
+            double cpp_sum(NumericVector x) {
+            int n = x.size();
+            double total = 0;
+            for(int i = 0; i < n; ++i) {
+            total += x[i];
+            }
+            return total;}
+            ')
+
+x <- rbeta(n = 1e4,3,4)
+
+stime <- microbenchmark(for_sum(x), cpp_sum(x),sum(x))
+stime
+
+ggplot2::autoplot(stime)
+```
+
+
+
+
+#五、各大迴圈套件的比較
+以PTT爬蟲為例，一次抓100個頁面，總共抓5次來看表現
+```{r}
+#PTT爬蟲函數
+ptt<-function(j){
+gos.data1<-NULL
+  curl <- getCurlHandle()
+  curlSetOpt(cookie="over18=1", followlocation = TRUE, curl=curl)
+  url <- paste0("https://www.ptt.cc/bbs/Gossiping/index",j,".html")
+  gos <- getURL(url, curl=curl)
+  gos.title<-read_html(gos) %>%html_nodes(".title a") %>% html_text()
+  gos.author<-read_html(gos) %>%html_nodes(".author") %>% html_text()
+  gos.push<-read_html(gos) %>%html_nodes(".nrec") %>% html_text()
+  gos.date<-read_html(gos) %>%html_nodes(".date") %>% html_text()
+  gos.link<- read_html(gos) %>% html_nodes(".title a") %>%  html_attr('href')
+  a<-grep("-",gos.author) 
+  if(length(gos.link)==length(gos.author)){
+    gos.data1=data.frame(gos.title=gos.title,gos.author=gos.author,gos.push=gos.push,gos.date=gos.date,
+                         gos.link=gos.link)
+  }else{
+    gos.data1=data.frame(gos.title=gos.title,gos.author=gos.author[-a],gos.push=gos.push[-a],gos.date=gos.date[-a],gos.link=gos.link)
+   gos.data1<<-gos.data1 
+  }
+}
+
+#尋找最新index
+idx<-function(){
+curl <- getCurlHandle()# 設定已滿18歲
+curlSetOpt(cookie="over18=1", followlocation = TRUE, curl=curl)#一樣問號
+url <- paste0("https://www.ptt.cc/bbs/Gossiping/index.html")#終於要放進來惹
+gos <- getURL(url, curl=curl)#啊啊粗乃惹
+tmp<-read_html(gos) %>% html_nodes(".wide") %>% html_attrs() %>% .[[2]] %>%
+  .[[2]] 
+min<-tmp %>% gregexpr("[0-9]", .) %>% .[[1]] %>% min()
+max<-tmp %>% gregexpr("[0-9]", .) %>% .[[1]] %>% max()
+index<<-substr(tmp,min,max) %>% as.numeric()
+}
+```
+```{r, include=FALSE}
+idx()
+```
+
+
+##I.用一般的for迴圈來執行
+```{r, warning=FALSE}
+time1<-c()
+for(i in 1:10)(
+  time1[i]<-system.time({final<-NULL
+for(j in (index-50):index){
+  ptt(j)
+  final1<-rbind(final,gos.data1)
+}}) %>% .[3]
+)
+time1
+
+
+```
+
+##II.用foreach來跑(dopar)
+
+```{r, warning=FALSE}
+time2<-c()
+for(i in 1:10){
+time2[i]<-system.time({cl<-makeCluster(20) 
+registerDoSNOW(cl)
+final2<-foreach(j=(index-50):index,.combine = "rbind",.packages = c("RCurl","dplyr","rvest","magrittr","tidyr"),.export = "ptt") %dopar% {ptt(j)}%>% .[3]
+stopCluster(cl)}) 
+}
+time2
+
+
+```
+
+
+
+##III.用compiler/for來跑
+```{r}
+cptt<-cmpfun(ptt)
+time3<-c()
+for(i in 1:10)(
+  time3[i]<-system.time({final<-NULL
+for(j in (index-50):index){
+  cptt(j)
+  final1<-rbind(final,gos.data1)
+}}) %>% .[3]
+)
+time3
+```
+
+##IV.用compiler/foreach來跑
+
+```{r, message=TRUE, warning=FALSE}
+cptt<-cmpfun(ptt)
+time4<-c()
+for(i in 1:10){
+time4[i]<-system.time({cl<-makeCluster(20) 
+registerDoSNOW(cl)
+final2<-foreach(j=(index-50):index,.combine = "rbind",.packages = c("RCurl","dplyr","rvest","magrittr","tidyr"),.export = "cptt") %dopar% {cptt(j)}%>% .[3]
+stopCluster(cl)}) 
+}
+time4
+
+```
+
+
+
+
+
+##V.用sapply來跑 
+```{r}
+time5<-c()
+for(i in 1:10){
+  time5[i]<-system.time({sapply((index-50):index,function(j){
+  ptt(j) 
+})}) %>% .[3]
+
+}
+time5
+```
+
+
+
+##比較五組不同的結果
+
+```{r}
+test<-data.frame(time1=time1,time2=time2,time3=time3,time4=time4,time5=time5)
+test2<-gather(test,"每個種類","時間")
+test3<-data.frame(test2,m=rep(1:10,5))
+test3$時間%<>%as.numeric()
+test3$m%<>%as.numeric()
+ggplot(data=test3)+geom_line(aes(x=m,y=時間,group=每個種類,colour=每個種類))+theme(text=element_text(size = 15, family = "HanziPenTC-W3"))+
+  xlab("")+scale_colour_manual(values = c("#e41a1c", "#377eb8","#4daf4a","#984ea3","#ff7f00"))
+```
+
+
+
+
