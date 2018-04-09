@@ -1,0 +1,271 @@
+---
+title: "rgl package"
+author: "蔡宜君"
+date: "2018/2/20"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#簡介
+
+rgl主要用來繪製OpenGL 3D的互動式圖型。 使用者可以使用滑鼠旋轉或放大圖型，即時的看到圖型的每個角度，此份教學以rgl主要語法及基礎繪圖的介紹為主。<br />
+<font size=1>*註:OpenGL（英語：Open Graphics Library，譯名：開放圖形庫或者「開放式圖形庫」）是用於彩現2D、3D向量圖形的跨語言、跨平台的應用程式編程介面（API）。</font>
+
+#基本概念
+
+1.rgl的繪圖指令與ggplot類似，每一次繪圖都是開啟新視窗後以疊圖的方式將圖層疊加上去。主要以繪製三維散佈圖、立體圖形、動畫播放為主。<br/>
+
+2.繪圖方式靈活，熟悉的人可以畫出較複雜的三維圖。<br/>
+3.若只需要繪製簡單的三維圖，建議使用其他套件如scatterplot3d、plotly等。
+
+#三維散佈圖
+```{r include = FALSE}
+library(knitr)
+library(rgl)
+library(plotly)
+data('iris')
+x<-iris$Sepal.Length
+y<-iris$Petal.Length
+z<-iris$Sepal.Width
+```
+
+##<font size = 2.5 >基本圖型 </font>##
+以指令 plot3d() 繪製基本圖
+```{r results = "hide"}
+open3d()
+```
+```{r}
+plot3d(x,y,z,main='3D scatter plot',xlab='Sepal.Length',ylab='Sepal.Width',zlab='Petal.Length',type='p',col= rainbow(150),size=3)# x可以是矩陣(matrix)或數列(list)，同時省略y、z
+aspect3d('iso')#調整箱子的長寬高比例
+rglwidget() #讓3D圖顯示於HTML的文件上
+```
+<br />
+*改變點的形狀
+```{r results = "hide"}
+open3d()
+```
+```{r}
+plot3d(x,y,z,xlab='Sepal.Length',ylab='Sepal.Width',zlab='Petal.Length',type='s',r=0.1,rainbow(150))
+rglwidget() #讓3D圖顯示於HTML的文件上
+```
+
+##<font size = 2.5 >美化 </font>
+
+雖然上述的 plot3d()  可以較簡單方便的繪製3D圖，但若想要美化或自訂呈現的樣子，就需要全部拆開並以層層堆疊的方式繪圖。
+<br />
+*指令 rgl.points() 及 points3d() 用來繪製基本3D散佈圖，並用指令 rgl.bg() 或 bg3d() 改變背景顏色
+```{r results = "hide"}
+open3d()#open3d預設為白底，rgl.open預設為黑底
+```
+```{r webgl=TRUE}
+rgl.bg(color='gray')
+rgl.points(x,y,z,color = rainbow(150))
+rglwidget() #讓3D圖顯示於HTML的文件上
+```
+<br />
+*使用指令 rgl.spheres() 或 spheres3d() 將觀察值繪製為球體
+```{r results = "hide"}
+open3d()
+```
+```{r webgl=TRUE}
+rgl.spheres(x,y,z,color =rainbow(150),r =0.1 )
+rglwidget()
+```
+<br />
+*使用指令 grid3d() 加入網格線
+```{r results = "hide"}
+open3d()
+```
+```{r}
+rgl.spheres(x,y,z,color =rainbow(150),r =0.1 )
+grid3d(c("x", "y", "z"))
+rglwidget()
+```
+<br />
+*使用指令 shaplist3d() 改變成其他形狀
+```{r results = "hide"}
+open3d()
+```
+```{r}
+shapelist3d(cube3d(), x, y, z, size =  0.1, 
+            color = rainbow(150))
+grid3d(c("x", "y", "z"))
+rglwidget()
+```
+<br />
+*使用指令 axis3d() 或 rgl.lines() 用來加入軸。
+```{r results = "hide"}
+open3d()
+```
+```{r }
+rgl.spheres(x,y,z,color = rainbow(150),r = 0.1 )
+grid3d(c("x", "y", "z"))
+axes3d(edges = c('x--', 'y--', 'z--')
+, labels = TRUE, tick = TRUE, nticks = 3 , color = 'black',lwd = 2,lenticks = 1)
+title3d(main = NULL, sub = NULL, xlab = 'x', ylab = 'y',
+    zlab = 'z')
+axis3d('x', pos = c(NA, 3, 3) , color = 'black' , nticks = 3 , tickslen=1 ,  lwd=1)#在中間畫一條平行x軸的線
+#edges為欲描繪的邊界，edges = 'bbox' 或是直接使用指令axes3d()代表繪上所有軸線。
+rglwidget()
+```
+<br />
+*使用axis3d()繪製的軸不會相交，如果希望軸相交，可以使用rgl.lines() 來加入軸。
+```{r results = "hide"}
+open3d()
+```
+```{r}
+rgl.spheres(x,y,z,color = rainbow(150),r =0.1 )
+rgl.lines(c(min(x), max(x)), c(min(y), min(y)), c(min(z),min(z)), color = "black")
+rgl.lines(c(min(x), min(x)), c(min(y),max(y)), c(min(z), min(z)), color = "red")
+rgl.lines(c(min(x), min(x)), c(min(y), min(y)), c(min(z),max(z)), color = "green")
+title3d(main = NULL, sub = NULL, xlab = 'x', ylab = 'y',
+    zlab = 'z' , col = 'red')
+#在中間畫一條平行x軸的線
+#edges為欲描繪的邊界，edges = 'bbox' 或是直接使用指令axes3d()代表繪上所有軸線。
+rglwidget()
+```
+<br />
+*bbox3d() 或 rgl.bbox() 用來加入自訂的邊界盒。
+```{r results = "hide"}
+open3d()
+```
+```{r results = "hide"}
+rgl.spheres(x,y,z,color =rainbow(150),r =0.1 )
+rgl.bbox(xlen=3, ylen=4, zlen=3,color = c("#36384C", "black"),marklen = 15 , alpha = 0.8 , axes=FALSE)
+rglwidget()
+```
+![image](/Users/YiChun/Desktop/螢幕快照 2018-02-26 下午11.27.58.png)
+<br />
+*依照種類改變顏色，並加入標籤
+```{r results = "hide"}
+par3d(windowRect = c(100, 100, 612, 612))#開啟大一點的視窗，par3d()為設置繪圖參數的指令
+```
+```{r results = "hide"}
+c<-palette(c("Rosybrown","#E3BAB3",'#849974'))[as.numeric(iris$Species)]
+rgl.spheres(x,y,z,color = c ,r =0.1 )
+grid3d(c("x", "y", "z"))
+legend3d("topright", legend = paste('Type', c('A', 'B', 'C')), pch = 16, col = c("Rosybrown","#E3BAB3",'#849974'), cex=1.5, inset=c(0.03))#pch為標籤種類，inset為與右上邊界的距離，cex越大標籤越大
+rglwidget()
+```
+![image](/Users/YiChun/Desktop/螢幕快照 2018-02-27 上午12.15.16.png)
+<br />
+*指令 planes3d() 跟 rgl.planes 在盒內繪製迴歸平面
+```{r results = "hide"}
+open3d()
+```
+```{r results = "hide"}
+rgl.spheres(x,y,z,color = palette(c("Rosybrown","#E3BAB3",'#849974'))[as.numeric(iris$Species)],r =0.1 )
+rgl.bbox(xlen=3, ylen=3, zlen=3,color = c("gray", "black"),marklen = 15 , alpha = 0.8 )
+fit <- lm(z ~ x + y)
+coefs <- coef(fit)
+planes3d(a=coefs["x"], b=coefs["y"], c = -1, d = coefs["(Intercept)"], alpha=0.50, col="black" )#繪製ax + by + cz + d = 0
+rglwidget()
+```
+![image](/Users/YiChun/Desktop/螢幕快照 2018-02-26 下午11.29.58.png)
+<br />
+*指令 clipplanes3d() 用來呈現平面其中一邊的觀察值
+```{r results = "hide"}
+open3d()
+```
+```{r }
+rgl.spheres(x,y,z,color = palette(c("Rosybrown","#E3BAB3",'#849974'))[as.numeric(iris$Species)],r =0.1 )
+rgl.bbox(xlen=3, ylen=3, zlen=3,color = c("gray", "black"),marklen = 15 , alpha = 0.8 )
+fit <- lm(z ~ x + y)
+coefs <- coef(fit)
+planes3d(a=coefs["x"], b=coefs["y"], c = -1, d = coefs["(Intercept)"], alpha=0.50, col="black" )#繪製ax + by + cz + d = 0
+clipplanes3d(a=coefs["x"], b=coefs["y"], c = -1, d = coefs["(Intercept)"])
+## 只呈現ax + by + cz + Int > 0
+rglwidget()
+```
+<br />
+*指令 ellipse3d() 繪製橢圓信賴區間
+```{r results = "hide" }
+open3d()
+```
+```{r results = "hide" }
+rgl.spheres(x,y,z,color = rainbow(150),r =0.1 )
+rgl.bbox(xlen=3, ylen=3, zlen=3,color = c("white", "black"),marklen = 15 , alpha = 0.8)
+ellips <- ellipse3d(cov(cbind(x,y,z)), 
+            centre=c(mean(x), mean(y), mean(z)), level = 0.95)#找出共變異矩陣以及中心點
+shade3d(ellips, col = "black", alpha = 0.3, lit = FALSE)
+#wire3d()製作網狀橢圓信賴區間
+rgl.viewpoint(zoom = 0.7)
+rglwidget()
+```
+![image](/Users/YiChun/Desktop/螢幕快照 2018-02-26 下午11.34.39.png)
+<br />
+*使用指令 bgplot() 將3D圖投影至平面
+```{r results = "hide" }
+open3d()
+```
+```{r}
+x <- rnorm(100)
+y <- rnorm(100)
+z <- rnorm(100)
+par3d(windowRect = c(100, 100, 612, 612))
+Sys.sleep(0.1)
+parent <- currentSubscene3d()
+mfrow3d(2, 2)
+plot3d(x, y, z, col=rainbow(100))
+next3d(reuse = FALSE)
+bgplot3d(plot(y, z, col=rainbow(100)))
+next3d(reuse = FALSE)
+bgplot3d(plot(x, z, col=rainbow(100)))
+next3d(reuse = FALSE)
+legend3d("center", c("2D Points", "3D Points"), pch = c(1, 16))
+useSubscene3d(parent)
+rglwidget()
+```
+
+#繪製平面
+
+*使用指令 persp3d() 
+```{r results = "hide"}
+open3d()
+```
+```{r}
+x <- 1:5/10
+y <- 1:5
+z <- x %o% y #外積，結果為矩陣
+z <- z + .2*z*runif(25) - .1*z
+persp3d(x, y, z, col=rainbow(30))
+grid3d(c("x", "y", "z"))
+rglwidget()
+```
+<br />
+*使用指令 surface3d() 繪製火山
+```{r results = "hide"}
+open3d()
+```
+```{r}
+#繪製火山
+data(volcano)
+z1 <-  3*volcano # 讓火山更立體
+x1 <- 10*(1:nrow(z1)) # 10 meter spacing (S to N)
+y1 <- 10*(1:ncol(z1)) # 10 meter spacing (E to W)
+zlim <- range(z1)
+zlen <- zlim[2] - zlim[1] + 1
+colorlut <- terrain.colors(zlen) # 設定一個與全距一樣多的色盤(地面的色彩)(有幾種高度)
+col <- colorlut[ z1 - zlim[1] + 1 ] # 為每一個高度的點設定顏色
+surface3d(x1, y1, z1, color = col, back = "lines")
+grid3d(c("x", "y+", "z"))
+rglwidget()
+```
+*註： 適用於繪製有"高度"資料的平面。
+<br />
+*補充：用 plotly 套件繪製快又美。
+```{r}
+# volcano is a numeric matrix that ships with R
+plot_ly(z = ~volcano) %>% add_surface()
+
+```
+
+
